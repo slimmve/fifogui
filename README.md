@@ -1,1 +1,1 @@
-fifo gui
+awa nalang
