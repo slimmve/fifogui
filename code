@@ -1,0 +1,131 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class FIFOGUI {
+
+    public static void main(String[] args) {
+
+        JFrame frm = new JFrame("FIFO");
+        frm.setSize(800, 800);
+        frm.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frm.setLayout(null);
+
+        JLabel lblTitle = new JLabel("FIFO Simulator", SwingConstants.CENTER);
+        lblTitle.setBounds(200, 10, 400, 30);
+        lblTitle.setFont(new Font("SansSerif", Font.BOLD, 18));
+
+        JLabel lblReference = new JLabel("Reference String:");
+        lblReference.setBounds(50, 60, 120, 30);
+        JTextField txtReference = new JTextField();
+        txtReference.setBounds(180, 60, 200, 30);
+
+        JLabel lblFrames = new JLabel("Frames:");
+        lblFrames.setBounds(50, 100, 120, 30);
+        JTextField txtFrames = new JTextField();
+        txtFrames.setBounds(180, 100, 50, 30);
+
+        JButton btnRun = new JButton("Run");
+        btnRun.setBounds(180, 140, 100, 30);
+
+        JButton btnClear = new JButton("Clear");
+        btnClear.setBounds(290, 140, 100, 30);
+
+        JTable tableOutput = new JTable();
+        JScrollPane scrollPane = new JScrollPane(tableOutput);
+        scrollPane.setBounds(50, 200, 700, 300);
+
+        JLabel lblPageFaults = new JLabel("Page Faults: 0/0");
+        lblPageFaults.setBounds(600, 60, 150, 30);
+
+        JLabel lblFaultRate = new JLabel("Fault Rate: 0.00%");
+        lblFaultRate.setBounds(600, 100, 150, 30);
+
+        btnRun.addActionListener(e -> {
+            String referenceString = txtReference.getText().trim();
+            String framesInput = txtFrames.getText().trim();
+
+            if (referenceString.isEmpty() || framesInput.isEmpty()) {
+                JOptionPane.showMessageDialog(frm, "Please enter both reference string and number of frames.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            try {
+                int numFrames = Integer.parseInt(framesInput);
+                String[] refArray = referenceString.split(",");
+                List<Integer> referenceList = new ArrayList<>();
+                for (String ref : refArray) {
+                    if (!ref.trim().isEmpty()) {
+                        referenceList.add(Integer.parseInt(ref.trim()));
+                    }
+                }
+
+                int[] pageFaults = new int[1];
+                String[][] tableData = performFIFO(referenceList, numFrames, pageFaults);
+
+                String[] columnNames = new String[referenceList.size()];
+                for (int i = 0; i < referenceList.size(); i++) columnNames[i] = String.valueOf(referenceList.get(i));
+
+                tableOutput.setModel(new javax.swing.table.DefaultTableModel(tableData, columnNames));
+
+                lblPageFaults.setText(String.format("Page Faults: %d/%d", pageFaults[0], referenceList.size()));
+                lblFaultRate.setText(String.format("Fault Rate: %.2f%%", (double) pageFaults[0] / referenceList.size() * 100));
+
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(frm, "Invalid input. Please enter numbers only.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        btnClear.addActionListener(e -> {
+            txtReference.setText("");
+            txtFrames.setText("");
+            tableOutput.setModel(new javax.swing.table.DefaultTableModel());
+            lblPageFaults.setText("Page Faults: 0/0");
+            lblFaultRate.setText("Fault Rate: 0.00%");
+        });
+
+        frm.add(lblTitle);
+        frm.add(lblReference);
+        frm.add(txtReference);
+        frm.add(lblFrames);
+        frm.add(txtFrames);
+        frm.add(btnRun);
+        frm.add(btnClear);
+        frm.add(scrollPane);
+        frm.add(lblPageFaults);
+        frm.add(lblFaultRate);
+
+        frm.setVisible(true);
+    }
+
+    private static String[][] performFIFO(List<Integer> referenceList, int numFrames, int[] pageFaults) {
+        List<List<String>> tableRows = new ArrayList<>();
+        List<Integer> frames = new ArrayList<>();
+        pageFaults[0] = 0;
+
+        for (int i = 0; i < numFrames; i++) tableRows.add(new ArrayList<>());
+
+        for (int page : referenceList) {
+            if (!frames.contains(page)) {
+                pageFaults[0]++;
+                if (frames.size() == numFrames) frames.remove(0);
+                frames.add(page);
+            }
+
+            for (int i = 0; i < numFrames; i++) {
+                if (i < frames.size()) tableRows.get(i).add(String.valueOf(frames.get(i)));
+                else tableRows.get(i).add(" ");
+            }
+        }
+
+        String[][] tableData = new String[numFrames][referenceList.size()];
+        for (int i = 0; i < numFrames; i++) {
+            for (int j = 0; j < referenceList.size(); j++) {
+                tableData[i][j] = tableRows.get(i).size() > j ? tableRows.get(i).get(j) : " ";
+            }
+        }
+        return tableData;
+    }
+}
