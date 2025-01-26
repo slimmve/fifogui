@@ -1,0 +1,194 @@
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.ArrayList;
+import java.util.Comparator;
+
+class Process {
+    int id, burstTime, priority, arrivalTime, waitingTime, turnaroundTime, completionTime;
+
+    public Process(int id, int burstTime, int priority, int arrivalTime) {
+        this.id = id;
+        this.burstTime = burstTime;
+        this.priority = priority;
+        this.arrivalTime = arrivalTime;
+    }
+}
+
+public class CPUNPP extends JFrame {
+    private DefaultTableModel tableModel;
+    private JTable table;
+    private JTextField burstTimeField, priorityField, arrivalTimeField;
+    private JButton addButton, simulateButton;
+    private ArrayList<Process> processes = new ArrayList<>();
+    private JPanel ganttChartPanel;
+    private JLabel avgWaitingTimeLabel, avgTurnaroundTimeLabel;
+
+    public CPUNPP() {
+        setTitle("CPU Scheduling - Non-Preemptive Priority");
+        setSize(800, 600);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLayout(new BorderLayout());
+
+        // Input panel
+        JPanel inputPanel = new JPanel(new GridLayout(2, 4, 10, 10));
+        inputPanel.setBorder(BorderFactory.createTitledBorder("Add Process"));
+
+        inputPanel.add(new JLabel("Burst Time:"));
+        burstTimeField = new JTextField();
+        inputPanel.add(burstTimeField);
+
+        inputPanel.add(new JLabel("Priority (Lower = Higher Priority):"));
+        priorityField = new JTextField();
+        inputPanel.add(priorityField);
+
+        inputPanel.add(new JLabel("Arrival Time:"));
+        arrivalTimeField = new JTextField();
+        inputPanel.add(arrivalTimeField);
+
+        addButton = new JButton("Add Process");
+        inputPanel.add(addButton);
+
+        simulateButton = new JButton("Simulate");
+        inputPanel.add(simulateButton);
+
+        add(inputPanel, BorderLayout.NORTH);
+
+        // Table panel
+        tableModel = new DefaultTableModel(new Object[]{"Process ID", "Burst Time", "Priority", "Arrival Time", "Waiting Time", "Turnaround Time", "Completion Time"}, 0);
+        table = new JTable(tableModel);
+        add(new JScrollPane(table), BorderLayout.CENTER);
+
+        // Statistics panel
+        JPanel statsPanel = new JPanel(new GridLayout(1, 2, 10, 10));
+        statsPanel.setBorder(BorderFactory.createTitledBorder("Statistics"));
+
+        avgWaitingTimeLabel = new JLabel("Average Waiting Time: -");
+        statsPanel.add(avgWaitingTimeLabel);
+
+        avgTurnaroundTimeLabel = new JLabel("Average Turnaround Time: -");
+        statsPanel.add(avgTurnaroundTimeLabel);
+
+        add(statsPanel, BorderLayout.EAST);
+
+        // Gantt Chart panel
+        ganttChartPanel = new JPanel();
+        ganttChartPanel.setBorder(BorderFactory.createTitledBorder("Gantt Chart"));
+        ganttChartPanel.setPreferredSize(new Dimension(800, 100));
+        add(ganttChartPanel, BorderLayout.SOUTH);
+
+        // Add process button action
+        addButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                try {
+                    int burstTime = Integer.parseInt(burstTimeField.getText());
+                    int priority = Integer.parseInt(priorityField.getText());
+                    int arrivalTime = Integer.parseInt(arrivalTimeField.getText());
+
+                    processes.add(new Process(processes.size() + 1, burstTime, priority, arrivalTime));
+                    tableModel.addRow(new Object[]{"P" + processes.size(), burstTime, priority, arrivalTime, "-", "-", "-"});
+
+                    burstTimeField.setText("");
+                    priorityField.setText("");
+                    arrivalTimeField.setText("");
+                } catch (NumberFormatException ex) {
+                    JOptionPane.showMessageDialog(CPUNPP.this, "Invalid input. Please enter integers.", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+
+        // Simulate button action
+        simulateButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                simulateScheduling();
+            }
+        });
+    }
+
+    private void simulateScheduling() {
+        // Sort processes by arrival time, then by priority (lower priority number means higher priority)
+        processes.sort(Comparator.comparingInt((Process p) -> p.arrivalTime).thenComparingInt(p -> p.priority));
+
+        int currentTime = 0;
+        ganttChartPanel.removeAll();
+        ganttChartPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
+
+        ArrayList<Process> scheduledProcesses = new ArrayList<>();
+        int totalWaitingTime = 0, totalTurnaroundTime = 0;
+
+        while (!processes.isEmpty()) {
+            Process selectedProcess = null;
+            for (Process process : processes) {
+                if (process.arrivalTime <= currentTime) {
+                    if (selectedProcess == null || process.priority < selectedProcess.priority) {
+                        selectedProcess = process;
+                    }
+                }
+            }
+
+            if (selectedProcess == null) {
+                currentTime++;
+                continue;
+            }
+
+            processes.remove(selectedProcess);
+            scheduledProcesses.add(selectedProcess);
+
+            if (currentTime < selectedProcess.arrivalTime) {
+                currentTime = selectedProcess.arrivalTime;
+            }
+
+            selectedProcess.waitingTime = currentTime - selectedProcess.arrivalTime;
+            selectedProcess.turnaroundTime = selectedProcess.waitingTime + selectedProcess.burstTime;
+            selectedProcess.completionTime = currentTime + selectedProcess.burstTime;
+
+            totalWaitingTime += selectedProcess.waitingTime;
+            totalTurnaroundTime += selectedProcess.turnaroundTime;
+
+            // Add Gantt chart block with time numbers
+            JPanel block = new JPanel(new BorderLayout());
+            block.setBackground(Color.CYAN);
+            block.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+            block.setPreferredSize(new Dimension(selectedProcess.burstTime * 20, 50));
+
+            JLabel processLabel = new JLabel("P" + selectedProcess.id, SwingConstants.CENTER);
+            JLabel timeLabel = new JLabel(currentTime + " - " + selectedProcess.completionTime, SwingConstants.CENTER);
+
+            block.add(processLabel, BorderLayout.CENTER);
+            block.add(timeLabel, BorderLayout.SOUTH);
+            ganttChartPanel.add(block);
+
+            currentTime += selectedProcess.burstTime;
+        }
+
+        // Calculate averages
+        int processCount = scheduledProcesses.size();
+        double avgWaitingTime = processCount > 0 ? (double) totalWaitingTime / processCount : 0;
+        double avgTurnaroundTime = processCount > 0 ? (double) totalTurnaroundTime / processCount : 0;
+
+        // Update statistics
+        avgWaitingTimeLabel.setText("Average Waiting Time: " + String.format("%.2f", avgWaitingTime));
+        avgTurnaroundTimeLabel.setText("Average Turnaround Time: " + String.format("%.2f", avgTurnaroundTime));
+
+        // Update table with results
+        tableModel.setRowCount(0);
+        for (Process process : scheduledProcesses) {
+            tableModel.addRow(new Object[]{"P" + process.id, process.burstTime, process.priority, process.arrivalTime, process.waitingTime, process.turnaroundTime, process.completionTime});
+        }
+
+        ganttChartPanel.revalidate();
+        ganttChartPanel.repaint();
+
+        JOptionPane.showMessageDialog(this, "Simulation complete!", "Success", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            new CPUNPP().setVisible(true);
+        });
+    }
+}
